@@ -1,7 +1,7 @@
 public class Calculadora {
     public int somar(int a, int b) {
-        //adicionado a subtracao
-        return a - b;
+        //adicionado a Multiply
+        return a * b;
     }
 
     public static void main(String[] args) {

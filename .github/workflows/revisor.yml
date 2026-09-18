@@ -7,20 +7,71 @@ on:
 jobs:
   analisar-codigo:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Baixar código do repositório
         uses: actions/checkout@v4
 
-      - name: Configurar ambiente Java
-        uses: actions/setup-java@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          node-version: '18'
 
-      - name: Tentar compilar o código Java (Validação de Erros)
-        run: |
-          echo "Procurando arquivos Java no repositório..."
-          find . -name "*.java"
-          echo "Tentando compilar a Calculadora..."
-          javac Calculadora.java
-          echo "Compilação concluída com sucesso!"
+      - name: Instalar dependência da API do Google
+        run: npm install @google/genai
+
+      - name: Executar Agente Revisor com Gemini Pro
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { GoogleGenAI } = require('@google/genai');
+            const fs = require('fs');
+            
+            // Inicializa a IA com a chave secreta do repositório
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+            
+            // Lê o código da Calculadora que está sendo enviado no PR
+            let codigoFonte = "";
+            try {
+              codigoFonte = fs.readFileSync('Calculadora.java', 'utf8');
+            } catch (e) {
+              codigoFonte = "Arquivo Calculadora.java não encontrado na raiz.";
+            }
+
+            const prompt = `Aja como um Arquiteto de Software e Revisor Sênior implacável. Analise o código Java abaixo, aponte melhorias de Clean Code, boas práticas, tratamento de erros ou bugs de sintaxe (como falta de ponto e vírgula):\n\n${codigoFonte}`;
+
+            console.log("Enviando código para o Gemini Pro analisar...");
+            
+            async function chamarGemini() {
+              try {
+                // Usando o modelo gemini-2.5-pro ou gemini-1.5-pro para análise profunda
+                const response = await ai.models.generateContent({
+                  model: 'gemini-2.5-pro',
+                  contents: prompt,
+                });
+                
+                const parecerIA = response.text;
+                console.log("Parecer gerado com sucesso pela IA.");
+
+                // Posta o resultado automaticamente como comentário no Pull Request
+                const ownerRepo = process.env.REPOSITORY.split('/');
+                await github.rest.issues.createComment({
+                  owner: ownerRepo[0],
+                  repo: ownerRepo[1],
+                  issue_number: parseInt(process.env.PR_NUMBER),
+                  body: `### 🤖 Relatório do Agente Revisor (Gemini Pro)\n\n${parecerIA}`
+                });
+              } catch (error) {
+                console.error("Erro ao chamar a API do Gemini:", error);
+                throw error;
+              }
+            }
+
+            await chamarGemini();

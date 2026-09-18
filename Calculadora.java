@@ -1,6 +1,7 @@
 public class Calculadora {
     public int somar(int a, int b) {
         return a + b;
+        //atualizado
     }
 
     public static void main(String[] args) {

@@ -34,10 +34,8 @@ jobs:
             const { GoogleGenAI } = require('@google/genai');
             const fs = require('fs');
             
-            // Inicializa a IA com a chave secreta do repositório
             const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
             
-            // Lê o código da Calculadora que está sendo enviado no PR
             let codigoFonte = "";
             try {
               codigoFonte = fs.readFileSync('Calculadora.java', 'utf8');
@@ -51,16 +49,14 @@ jobs:
             
             async function chamarGemini() {
               try {
-                // Usando o modelo gemini-2.5-pro ou gemini-1.5-pro para análise profunda
                 const response = await ai.models.generateContent({
                   model: 'gemini-2.5-pro',
                   contents: prompt,
                 });
                 
-                const parecerIA = response.text;
+                const parecerIA = response.text || "Análise concluída sem retorno de texto.";
                 console.log("Parecer gerado com sucesso pela IA.");
 
-                // Posta o resultado automaticamente como comentário no Pull Request
                 const ownerRepo = process.env.REPOSITORY.split('/');
                 await github.rest.issues.createComment({
                   owner: ownerRepo[0],
@@ -69,7 +65,7 @@ jobs:
                   body: `### 🤖 Relatório do Agente Revisor (Gemini Pro)\n\n${parecerIA}`
                 });
               } catch (error) {
-                console.error("Erro ao chamar a API do Gemini:", error);
+                console.error("Erro detalhado ao chamar a API do Gemini:", error);
                 throw error;
               }
             }

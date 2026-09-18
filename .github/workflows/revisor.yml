@@ -54,7 +54,15 @@ jobs:
                   })
                 });
 
-                const data = await response.json();
+                const rawBody = await response.text();
+                let data = {};
+                if (rawBody) {
+                  try {
+                    data = JSON.parse(rawBody);
+                  } catch {
+                    data = { rawBody };
+                  }
+                }
 
                 if (response.ok) {
                   return data;

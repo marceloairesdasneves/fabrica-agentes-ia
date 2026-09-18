@@ -16,7 +16,7 @@ public final class Calculator {
      * @throws ArithmeticException if the result overflows an int.
      */
     public static int sum(int addend1, int addend2) {
-        return Math.addExact(addend1, addend2); // Previne estouro de memória/limite
+        return Math.addExact(addend1, addend2) // Previne estouro de memória/limite
     }
 
     /**

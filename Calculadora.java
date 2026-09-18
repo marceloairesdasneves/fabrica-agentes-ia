@@ -19,6 +19,10 @@ public final class Calculator {
         return Math.addExact(addend1, addend2); // Previne estouro de memória/limite
     }
 
+    public static int subtract(int value1, int value2) {
+        return Math.subtractExact(value1, value2); // Previne estouro de memória/limite
+    }
+
     /**
      * Multiplies two integers safely.
      * @throws ArithmeticException if the result overflows an int.

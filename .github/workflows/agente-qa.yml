@@ -48,6 +48,7 @@ jobs:
             let attempt = 0;
             let success = false;
             let data;
+            let lastStatus = 0;
 
             while (attempt < maxRetries && !success) {
               attempt++;
@@ -61,12 +62,15 @@ jobs:
                 });
 
                 data = await response.json();
+                lastStatus = response.status;
                 
                 if (response.ok) {
                   success = true;
                 } else if (response.status === 503 && attempt < maxRetries) {
                   console.log(`Tentativa ${attempt} falhou por alta demanda (503). Aguardando antes de tentar novamente...`);
                   await new Promise(resolve => setTimeout(resolve, 4000 * attempt));
+                } else if (response.status === 503) {
+                  console.log("Gemini permaneceu indisponível após as tentativas. Publicando aviso no PR sem falhar o workflow.");
                 } else {
                   throw new Error(`Erro na API do Gemini: ${JSON.stringify(data)}`);
                 }
@@ -77,10 +81,20 @@ jobs:
               }
             }
 
+            const ownerRepo = process.env.REPOSITORY.split('/');
+            if (!success && lastStatus === 503) {
+              await github.rest.issues.createComment({
+                owner: ownerRepo[0],
+                repo: ownerRepo[1],
+                issue_number: parseInt(process.env.PR_NUMBER),
+                body: "### 🧪 Relatório do Agente QA (Gerador de Testes)\n\n⚠️ Não foi possível gerar os testes desta vez porque o modelo Gemini está com alta demanda (503/UNAVAILABLE). O workflow não falhou para evitar bloqueio temporário; tente executar novamente mais tarde."
+              });
+              return;
+            }
+
             const parecerIA = data.candidates?.[0]?.content?.parts?.[0]?.text || "Nenhum teste gerado.";
             console.log("Testes unitários gerados com sucesso pelo Agente QA.");
 
-            const ownerRepo = process.env.REPOSITORY.split('/');
             await github.rest.issues.createComment({
               owner: ownerRepo[0],
               repo: ownerRepo[1],

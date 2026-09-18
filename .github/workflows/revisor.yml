@@ -76,7 +76,11 @@ jobs:
                   continue;
                 }
 
-                const erro = new Error(`Erro na API do Gemini: ${JSON.stringify(data)}`);
+                const detalhesErro =
+                  data?.error
+                    ? JSON.stringify(data.error)
+                    : data?.rawBody || JSON.stringify(data) || "sem detalhes de resposta";
+                const erro = new Error(`Erro na API do Gemini (HTTP ${response.status}): ${detalhesErro}`);
                 erro.name = geminiIndisponivel ? "GeminiTemporariamenteIndisponivel" : "ErroGemini";
                 throw erro;
               }

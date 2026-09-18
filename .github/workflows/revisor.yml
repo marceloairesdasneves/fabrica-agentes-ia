@@ -1,0 +1,25 @@
+name: Agente Revisor Gemini
+
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  analisar-codigo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Executar Agente de Revisão
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Iniciando a auditoria do agente revisor..."
+          # Aqui o script futuramente chamará a API oficial do Google usando a chave dos Secrets
+          echo "Ambiente de nuvem configurado com sucesso!"

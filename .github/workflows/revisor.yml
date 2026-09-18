@@ -7,6 +7,9 @@ on:
 jobs:
   analisar-codigo:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Baixar código do repositório
         uses: actions/checkout@v4
@@ -16,10 +19,52 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Executar Agente de Revisão
+      - name: Instalar dependência da API do Google
+        run: npm install @google/genai
+
+      - name: Executar Agente Revisor com Gemini Pro
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          echo "Iniciando a auditoria do agente revisor..."
-          # Aqui o script futuramente chamará a API oficial do Google usando a chave dos Secrets
-          echo "Ambiente de nuvem configurado com sucesso!"
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            import('fs').then(async (fs) => {
+              const { GoogleGenAI } = await import('@google/genai');
+              
+              const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+              
+              let codigoFonte = "";
+              try {
+                codigoFonte = fs.readFileSync('Calculadora.java', 'utf8');
+              } catch (e) {
+                codigoFonte = "Arquivo Calculadora.java não encontrado na raiz.";
+              }
+
+              const prompt = `Aja como um Arquiteto de Software e Revisor Sênior implacável. Analise o código Java abaixo, aponte melhorias de Clean Code, boas práticas, tratamento de erros ou bugs de sintaxe (como falta de ponto e vírgula):\n\n${codigoFonte}`;
+
+              console.log("Enviando código para o Gemini Pro analisar...");
+              
+              try {
+                const response = await ai.models.generateContent({
+                  model: 'gemini-2.5-pro',
+                  contents: prompt,
+                });
+                
+                const parecerIA = response.text || "Análise concluída sem retorno de texto.";
+                console.log("Parecer gerado com sucesso pela IA.");
+
+                const ownerRepo = process.env.REPOSITORY.split('/');
+                await github.rest.issues.createComment({
+                  owner: ownerRepo[0],
+                  repo: ownerRepo[1],
+                  issue_number: parseInt(process.env.PR_NUMBER),
+                  body: `### 🤖 Relatório do Agente Revisor (Gemini Pro)\n\n${parecerIA}`
+                });
+              } catch (error) {
+                console.error("Erro detalhado ao chamar a API do Gemini:", error);
+                throw error;
+              }
+            });

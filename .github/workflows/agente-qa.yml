@@ -29,18 +29,31 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
+            const ownerRepo = process.env.REPOSITORY.split('/');
             
-            // Exemplo buscando a classe Calculator.java ou qualquer arquivo de negócio alterado
-            let codigoFonte = "";
-            try {
-              codigoFonte = fs.readFileSync('Calculator.java', 'utf8');
-            } catch (e) {
-              codigoFonte = "Classe principal não encontrada na raiz para gerar testes.";
+            // Busca os arquivos modificados no Pull Request atual dinamicamente
+            const filesResponse = await github.rest.pulls.listFiles({
+              owner: ownerRepo[0],
+              repo: ownerRepo[1],
+              pull_number: parseInt(process.env.PR_NUMBER)
+            });
+
+            // Filtra o primeiro arquivo .java alterado no PR
+            const javaFile = filesResponse.data.find(f => f.filename.endsWith('.java'));
+            
+            if (!javaFile) {
+              console.log("Nenhum arquivo Java encontrado nas alterações deste PR.");
+              return;
             }
 
+            console.log(`Lendo o conteúdo do arquivo alterado: ${javaFile.filename}`);
+            
+            // Faz o download do conteúdo bruto do arquivo modificado
+            const fileContentResponse = await fetch(javaFile.raw_url);
+            const codigoFonte = await fileContentResponse.text();
+
             const prompt = `Aja como um Engenheiro de QA Sênior e especialista em testes automatizados com JUnit 5 e Mockito. 
-            Analise a classe Java abaixo e escreva uma classe de teste unitário completa, cobrindo cenários de sucesso, falha e casos limites (edge cases):\n\n${codigoFonte}`;
+            Analise a classe Java abaixo (${javaFile.filename}) e escreva uma classe de teste unitário completa, cobrindo cenários de sucesso, falha e casos limites (edge cases):\n\n${codigoFonte}`;
 
             console.log("Enviando código para o Agente QA gerar os testes...");
 
@@ -72,7 +85,7 @@ jobs:
                 }
               } catch (err) {
                 if (attempt >= maxRetries) throw err;
-                console.log(`Erro na tentativa ${attempt}: ${err.message}. Retentando...`);
+                console.log(`Tentativa ${attempt} falhou: ${err.message}. Retentando...`);
                 await new Promise(resolve => setTimeout(resolve, 4000 * attempt));
               }
             }
@@ -80,10 +93,9 @@ jobs:
             const parecerIA = data.candidates?.[0]?.content?.parts?.[0]?.text || "Nenhum teste gerado.";
             console.log("Testes unitários gerados com sucesso pelo Agente QA.");
 
-            const ownerRepo = process.env.REPOSITORY.split('/');
             await github.rest.issues.createComment({
               owner: ownerRepo[0],
               repo: ownerRepo[1],
               issue_number: parseInt(process.env.PR_NUMBER),
-              body: `### 🧪 Relatório do Agente QA (Gerador de Testes)\n\nAbaixo estão os testes unitários sugeridos em JUnit 5 para o seu código:\n\n${parecerIA}`
+              body: `### 🧪 Relatório do Agente QA (Gerador de Testes)\n\nAbaixo estão os testes unitários sugeridos em JUnit 5 para o arquivo \`${javaFile.filename}\`:\n\n${parecerIA}`
             });
